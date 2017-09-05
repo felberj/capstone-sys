@@ -12,6 +12,8 @@ extern crate pkg_config;
 #[cfg(feature = "build_capstone_cmake")]
 extern crate cmake;
 
+extern crate os_type;
+
 #[cfg(feature = "use_bindgen")]
 use std::fs::copy;
 use std::path::PathBuf;
@@ -53,12 +55,10 @@ fn find_capstone_header(header_search_paths: &Vec<PathBuf>, name: &str) -> Optio
 fn write_bindgen_bindings(header_search_paths: &Vec<PathBuf>, update_pregenerated_bindings: bool) {
     let mut builder = bindgen::Builder::default()
         .rust_target(bindgen::RustTarget::Stable_1_19)
-        .header(
-            find_capstone_header(header_search_paths, "capstone.h")
-                .expect("Could not find header")
-                .to_str()
-                .unwrap(),
-        )
+        .header(find_capstone_header(header_search_paths, "capstone.h")
+            .expect("Could not find header")
+            .to_str()
+            .unwrap())
         .disable_name_namespacing()
         .prepend_enum_name(false)
         .generate_comments(true)
@@ -67,8 +67,7 @@ fn write_bindgen_bindings(header_search_paths: &Vec<PathBuf>, update_pregenerate
 
     // Whitelist cs_.* functions and types
     let pattern = String::from("cs_.*");
-    builder = builder
-        .whitelisted_function(pattern.clone())
+    builder = builder.whitelisted_function(pattern.clone())
         .whitelisted_type(pattern.clone());
 
     // Whitelist types with architectures
@@ -81,17 +80,16 @@ fn write_bindgen_bindings(header_search_paths: &Vec<PathBuf>, update_pregenerate
 
     // Write bindings to $OUT_DIR/bindings.rs
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap()).join(BINDINGS_FILE);
-    bindings
-        .write_to_file(out_path.clone())
+    bindings.write_to_file(out_path.clone())
         .expect("Unable to write bindings");
 
     if update_pregenerated_bindings {
-        let stored_bindgen_header: PathBuf = [
-            env::var("CARGO_MANIFEST_DIR").expect("Could not find cargo environment variable"),
-            "pre_generated".into(),
-            BINDINGS_FILE.into(),
-        ].iter()
-            .collect();
+        let stored_bindgen_header: PathBuf =
+            [env::var("CARGO_MANIFEST_DIR").expect("Could not find cargo environment variable"),
+             "pre_generated".into(),
+             BINDINGS_FILE.into()]
+                .iter()
+                .collect();
         copy(out_path, stored_bindgen_header).expect("Unable to update capstone bindings");
     }
 }
@@ -99,13 +97,11 @@ fn write_bindgen_bindings(header_search_paths: &Vec<PathBuf>, update_pregenerate
 /// Find system capstone library and return link type
 #[cfg(feature = "use_system_capstone")]
 fn find_system_capstone(header_search_paths: &mut Vec<PathBuf>) -> Option<LinkType> {
-    assert!(
-        !cfg!(feature = "build_capstone_cmake"),
-        "build_capstone_cmake feature is only valid when using bundled cmake"
-    );
+    assert!(!cfg!(feature = "build_capstone_cmake"),
+            "build_capstone_cmake feature is only valid when using bundled cmake");
 
-    let capstone_lib =
-        pkg_config::find_library("capstone").expect("Could not find system capstone");
+    let capstone_lib = pkg_config::find_library("capstone")
+        .expect("Could not find system capstone");
     header_search_paths.append(&mut capstone_lib.include_paths.clone());
     Some(LinkType::Dynamic)
 }
@@ -127,12 +123,16 @@ fn main() {
             #[cfg(feature = "build_capstone_cmake")]
             cmake();
         } else {
-            //let target = env::var("TARGET").unwrap();
-            //let windows = target.contains("windows");
+            // let target = env::var("TARGET").unwrap();
+            // let windows = target.contains("windows");
             // TODO: need to add this argument for windows 64-bit, msvc, dunno, read
             // COMPILE_MSVC.txt file cygwin-mingw64
+            let make_args = match os_type::current_platform() {
+                os_type::OSType::OSX => ["mac-universal-no"],
+                _ => [""],
+            };
             let out_dir = env::var("OUT_DIR").unwrap();
-            let _ = Command::new("./make.sh").current_dir("capstone").status();
+            let _ = Command::new("./make.sh").args(&make_args).current_dir("capstone").status();
             let capstone = "libcapstone.a";
             let _ = Command::new("cp")
                 .current_dir("capstone")
@@ -157,13 +157,9 @@ fn main() {
     // If UPDATE_CAPSTONE_BINDINGS is set, then updated the pre-generated capstone bindings
     let update_pregenerated_bindings = env::var("UPDATE_CAPSTONE_BINDINGS").is_ok();
     if update_pregenerated_bindings {
-        assert!(
-            cfg!(feature = "use_bindgen"),
-            concat!(
-                "Setting UPDATE_CAPSTONE_BINDINGS only makes ",
-                "sense when enabling feature \"use_bindgen\""
-            )
-        );
+        assert!(cfg!(feature = "use_bindgen"),
+                concat!("Setting UPDATE_CAPSTONE_BINDINGS only makes ",
+                        "sense when enabling feature \"use_bindgen\""));
     }
 
     // Only run bindgen if we are *not* using the bundled capstone bindings

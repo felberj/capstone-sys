@@ -15,6 +15,7 @@ repository = "https://github.com/capstone-rust/capstone-sys"
 bindgen = { optional = true, version = "0.30.0" }
 pkg-config = { optional = true, version = "0.3" }
 cmake = {optional = true, version = "0.1.2"}
+os_type="0.6"
 
 [features]
 # use bundled capstone by default instead of the system capstone
